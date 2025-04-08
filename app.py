@@ -13,12 +13,24 @@ def pil_image_to_data_url(image):
     img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
     return f"data:image/png;base64,{img_str}"
 
-# Monkey-patch: st_image modülündeki image_to_url fonksiyonunu tanımlıyoruz.
-def image_to_url(pil_img, height, width):
-    # Görüntüyü istenen boyutlara yeniden boyutlandır
-    img_resized = pil_img.resize((width, height))
-    # ve base64 veri URL'sine dönüştür
-    return pil_image_to_data_url(img_resized)
+# Custom _resize_img: Eğer img bir PIL.Image ise istenen boyuta yeniden boyutlandırır,
+# değilse, olduğu gibi geri döner.
+def custom_resize_img(img, new_height, new_width):
+    if isinstance(img, Image.Image):
+         return img.resize((int(new_width), int(new_height)))
+    return img
+
+# Custom image_to_url: _resize_img ile boyutlandırılmış resmi base64 URL'sine çevirir.
+def custom_image_to_url(img, height, width):
+    resized = custom_resize_img(img, height, width)
+    if isinstance(resized, Image.Image):
+         return pil_image_to_data_url(resized)
+    return resized
+
+# Monkey patch: st_image modülündeki fonksiyonları güncelliyoruz.
+st_image._resize_img = custom_resize_img
+st_image.image_to_url = custom_image_to_url
+
 
 # Bu satır ile st_image.image_to_url artık bizim tanımladığımız fonksiyonu gösterecek.
 st_image.image_to_url = image_to_url
@@ -27,7 +39,7 @@ st_image.image_to_url = image_to_url
 st.title("Dekorasyon Uygulaması")
 st.write("Bu uygulama, yüzey resminiz üzerinde seçtiğiniz alana dekoratif doku uygulamanızı sağlar.")
 
-# Adım 1: Dekore edilecek yüzey resmini yükleme
+# Adım 1: Yüzey resmini yükleme
 st.header("Adım 1: Yüzey Resmini Yükleyin")
 uploaded_surface = st.file_uploader("Dekore edeceğiniz yüzeyin resmini yükleyin (jpg, jpeg, png)", type=["jpg", "jpeg", "png"])
 
@@ -35,22 +47,24 @@ if uploaded_surface:
     base_image = Image.open(uploaded_surface).convert("RGB")
     st.image(base_image, caption="Yüklenen Yüzey Resmi", use_column_width=True)
     
-    # Adım 2: Dekor edilecek alanı seçme (çokgen çizimi)
+    # Adım 2: Dekorasyon alanını seçme (çizim)
     st.header("Adım 2: Dekorasyon Alanını Belirleyin")
-    st.write("Resim üzerinde alan belirlemek için fare ile çokgen çiziniz (min. 3 nokta, ideal olarak 4 nokta).")
+    st.write("Resim üzerinde alan belirlemek için fare ile çokgen çizin (min. 3 nokta, ideal olarak 4 nokta).")
     
-    # Arka plan resmi olarak doğrudan PIL image nesnesini kullanıyoruz.
     canvas_result = st_canvas(
-        fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu rengi
+        fill_color="rgba(255,165,0,0.3)",
         stroke_width=2,
         stroke_color="#FF0000",
         background_color="#eee",
-        background_image=base_image,  # PIL image nesnesini gönderiyoruz.
+        background_image=base_image,  # PIL.Image nesnesini veriyoruz.
         height=base_image.height,
         width=base_image.width,
         drawing_mode="polygon",
         key="canvas",
     )
+    
+    # (Devamında çizim verilerini işleme ve sonraki adımlar...)
+
     
     # Çizim verilerini işleme:
     if canvas_result.json_data is not None:
