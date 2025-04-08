@@ -3,3 +3,5 @@ streamlit-drawable-canvas
 pillow
 opencv-python-headless
 numpy
+torch
+torchvision
