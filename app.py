@@ -69,18 +69,22 @@ if uploaded_surface:
     st.header("Adım 2: Dekorasyon Alanını Belirleyin")
     st.write("Resim üzerinde alan belirlemek için fare ile çokgen çizin (en az 3 nokta, ideal olarak 4 nokta).")
     
-    # Arka plan resmi olarak doğrudan PIL.Image nesnesini gönderiyoruz.
-    canvas_result = sdc.st_canvas(
-        fill_color="rgba(255,165,0,0.3)",   # Yarı saydam dolgu rengi
-        stroke_width=2,
-        stroke_color="#FF0000",
-        background_color="#eee",
-        background_image=base_image,
-        height=base_image.height,
-        width=base_image.width,
-        drawing_mode="polygon",
-        key="canvas"
-    )
+  # Arka plan resmini base64 URL'ye çeviriyoruz.
+bg_img_url = pil_image_to_data_url(base_image)
+
+canvas_result = sdc.st_canvas(
+    fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu rengi
+    stroke_width=2,
+    stroke_color="#FF0000",
+    # background_color parametresini kaldırabilir veya aşağıdaki gibi şeffaf yapabilirsiniz:
+    background_color="rgba(0,0,0,0)",  
+    background_image=bg_img_url,       # Base64 URL'sini kullanıyoruz.
+    height=base_image.height,
+    width=base_image.width,
+    drawing_mode="polygon",
+    key="canvas"
+)
+
     
     # Çizim verilerini işleme
     if canvas_result.json_data is not None:
