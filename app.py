@@ -2,174 +2,112 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import cv2
-import base64
-from io import BytesIO
+from streamlit_drawable_canvas import st_canvas
 
-# streamlit_drawable_canvas modülünü sdc (alias) olarak import ediyoruz.
-import streamlit_drawable_canvas as sdc
+st.set_page_config(page_title="Swap Uygulaması", layout="wide")
 
-##############################################
-# Yardımcı Fonksiyonlar ve Monkey-Patch İşlemleri
-##############################################
+st.title("Swap Uygulaması: Referans Oda ile Dekore Edilen Oda")
+st.write("Bu uygulamada, referans resimdeki içeriği, hedef odada belirlediğiniz alana geometrik olarak uyarlayarak swap yapabilirsiniz.")
 
-def pil_image_to_data_url(image):
-    """PIL.Image nesnesini base64 veri URL'sine dönüştürür."""
-    buffered = BytesIO()
-    image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{img_str}"
+#############################
+# Adım 1: İki Resim Yükleme
+#############################
 
-def custom_resize_img(img, new_height, new_width):
-    """Eğer img bir PIL.Image ise belirtilen boyuta yeniden boyutlandırır;
-    eğer img bir data URL (string) ise önce PIL.Image'e çevirir, sonra yeniden boyutlandırır."""
-    if isinstance(img, Image.Image):
-        return img.resize((int(new_width), int(new_height)))
-    elif isinstance(img, str):
-        try:
-            header, encoded = img.split(',', 1)
-            data = base64.b64decode(encoded)
-            pil_img = Image.open(BytesIO(data))
-            return pil_img.resize((int(new_width), int(new_height)))
-        except Exception:
-            return img
-    return img
+st.sidebar.header("1. Resimleri Yükleyin")
+ref_file = st.sidebar.file_uploader("Referans Oda Resmini Yükleyin", type=["jpg", "jpeg", "png"], key="ref")
+target_file = st.sidebar.file_uploader("Dekore Edilecek Oda Resmini Yükleyin", type=["jpg", "jpeg", "png"], key="target")
 
-def custom_image_to_url(img, height, width, *args, **kwargs):
-    """custom_resize_img kullanılarak görüntüyü yeniden boyutlandırır ve base64 URL formatına çevirir."""
-    resized = custom_resize_img(img, height, width)
-    if isinstance(resized, Image.Image):
-        return pil_image_to_data_url(resized)
-    return resized
-
-# Monkey-patch: streamlit_drawable_canvas içinde kullanılan st_image fonksiyonlarını güncelliyoruz.
-sdc.st_image._resize_img = custom_resize_img
-sdc.st_image.image_to_url = custom_image_to_url
-
-##############################################
-# Uygulama Başlangıcı
-##############################################
-
-st.title("Dekorasyon Uygulaması")
-st.write("Bu uygulama, yüklediğiniz yüzey resmi üzerinde seçtiğiniz alana dekoratif doku yerleştirmenizi sağlar.")
-
-##############################################
-# Adım 1: Yüzey Resmini Yükleme
-##############################################
-st.header("Adım 1: Yüzey Resmini Yükleyin")
-uploaded_surface = st.file_uploader(
-    "Dekore edeceğiniz yüzeyin resmini yükleyin (jpg, jpeg, png)",
-    type=["jpg", "jpeg", "png"]
-)
-
-if uploaded_surface:
-    base_image = Image.open(uploaded_surface).convert("RGB")
-    st.image(base_image, caption="Yüklenen Yüzey Resmi", use_column_width=True)
+if ref_file and target_file:
+    ref_img = Image.open(ref_file).convert("RGB")
+    target_img = Image.open(target_file).convert("RGB")
     
-    ##############################################
-    # Adım 2: Dekorasyon Alanını Belirleyin (Çizim)
-    ##############################################
-    st.header("Adım 2: Dekorasyon Alanını Belirleyin")
-    st.write("Resim üzerinde alan belirlemek için fare ile çokgen çizin (en az 3 nokta, ideal olarak 4 nokta).")
+    st.subheader("Yüklenen Resimler")
+    cols = st.columns(2)
+    with cols[0]:
+        st.image(ref_img, caption="Referans Oda Resmi", use_column_width=True)
+    with cols[1]:
+        st.image(target_img, caption="Dekore Edilecek Oda Resmi", use_column_width=True)
     
-    # Arka plan resmi olarak PIL.Image nesnesini (base_image) veriyoruz.
-    canvas_result = sdc.st_canvas(
-        fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu rengi
+    ###################################
+    # Adım 2: Hedef Alanda Alan Seçimi
+    ###################################
+    st.header("Adım 2: Hedef Oda Üzerinde Alan Belirleyin")
+    st.write("Hedef oda resmi üzerinde swap işleminin uygulanacağı alanı belirlemek için fare ile çokgen çizin. "
+             "En az 3 nokta seçin; 3 nokta seçilirse otomatik olarak 4. nokta hesaplanır, 4'ten fazla nokta seçilirse ilk 4 nokta kullanılır.")
+    
+    # St_canvas kullanarak hedef oda resmi üzerinde çizim yapıyoruz.
+    # st_canvas fonksiyonu PIL.Image nesnesi de kabul edebiliyor.
+    canvas_result = st_canvas(
+        fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu
         stroke_width=2,
         stroke_color="#FF0000",
-        background_color="rgba(0,0,0,0)",    # Şeffaf arka plan
-        background_image=base_image,         # PIL.Image nesnesi burada
-        height=base_image.height,
-        width=base_image.width,
+        background_color="#eee",           # Arka plan rengi (şeffaf için "rgba(0,0,0,0)")
+        background_image=target_img,       # Doğrudan PIL.Image kullanıyoruz
+        height=target_img.height,
+        width=target_img.width,
         drawing_mode="polygon",
         key="canvas"
     )
     
-    # Çizim verilerini işleme: Kullanıcının çizdiği çokgenin koordinatlarını alıyoruz.
+    ##################################################
+    # Adım 3: Seçilen Alanın Koordinatlarını İşleme
+    ##################################################
     if canvas_result.json_data is not None:
         objects = canvas_result.json_data.get("objects", [])
         if objects:
-            poly = objects[0]  # İlk çizilen çokgeni kullanıyoruz.
-            coords = []
-            # Çokgen çiziminde "M" (başlat) ve "L" (çizgi) komutlarını kullanarak koordinatları elde ediyoruz.
-            for item in poly["path"]:
+            poly = objects[0]  # İlk çizilen çokgeni kullanıyoruz
+            points = []
+            # Çizim verisinde "M" (moveto) ve "L" (lineto) komutları kullanılmıştır.
+            for item in poly.get("path", []):
                 if item[0] in ["M", "L"]:
-                    coords.append([item[1], item[2]])
-            if len(coords) < 3:
+                    points.append([item[1], item[2]])
+            if len(points) < 3:
                 st.error("Lütfen en az 3 nokta seçin!")
             else:
-                st.write("Seçtiğiniz Noktalar:", coords)
-                # Eğer tam olarak 3 nokta seçildiyse, basit bir hesapla 4. noktayı ekleyelim.
-                if len(coords) == 3:
-                    def compute_fourth_point(points):
-                        p0, p1, p2 = points
+                st.write("Seçilen Noktalar:", points)
+                # Eğer 3 nokta seçilmişse, otomatik olarak 4. nokta hesaplayalım.
+                if len(points) == 3:
+                    def compute_fourth_point(p0, p1, p2):
                         return [p0[0] + p2[0] - p1[0], p0[1] + p2[1] - p1[1]]
-                    fourth = compute_fourth_point(coords)
-                    coords.append(fourth)
-                    st.write("Otomatik eklenen 4. nokta:", fourth)
-                # Eğer 4'ten fazla nokta seçildiyse, ilk 4 noktayı kullanıyoruz.
-                if len(coords) > 4:
-                    coords = coords[:4]
-                    st.write("İlk 4 nokta kullanıldı:", coords)
+                    p0, p1, p2 = points
+                    p3 = compute_fourth_point(p0, p1, p2)
+                    points.append(p3)
+                    st.write("Otomatik Eklenen 4. Nokta:", p3)
+                # Eğer 4'ten fazla nokta seçildiyse, sadece ilk 4 nokta alınır.
+                if len(points) > 4:
+                    points = points[:4]
+                    st.write("Kullanılan 4 Nokta:", points)
                 
-                ##############################################
-                # Adım 3: Dekoratif Doku Yükleme
-                ##############################################
-                st.header("Adım 3: Dekoratif Doku Yükleyin")
-                uploaded_texture = st.file_uploader(
-                    "Dekoratif doku resmini yükleyin (jpg, jpeg, png)",
-                    type=["jpg", "jpeg", "png"],
-                    key="texture"
-                )
-                if uploaded_texture:
-                    texture_image = Image.open(uploaded_texture).convert("RGB")
-                    st.image(texture_image, caption="Yüklenen Dekoratif Doku", use_column_width=True)
-                    
-                    ##############################################
-                    # Adım 4: Boyut Bilgilerini Girin
-                    ##############################################
-                    st.header("Adım 4: Boyut Bilgilerini Girin")
-                    st.write("Lütfen dekorasyon alanının yaklaşık uzunluk ve genişlik değerlerini ve dekoratif materyalin boyutunu girin (örn. cm veya m cinsinden, aynı birimde).")
-                    area_length = st.number_input("Dekorasyon Alanı Uzunluğu", min_value=1.0, value=100.0)
-                    area_width = st.number_input("Dekorasyon Alanı Genişliği", min_value=1.0, value=100.0)
-                    deco_width = st.number_input("Dekoratif Materyal Genişliği", min_value=1.0, value=10.0)
-                    deco_height = st.number_input("Dekoratif Materyal Yüksekliği", min_value=1.0, value=10.0)
-                    
-                    ##############################################
-                    # Adım 5: Dekorasyonu Uygula (Perspektif Dönüşümü)
-                    ##############################################
-                    if st.button("Dekorasyonu Uygula"):
-                        base_np = np.array(base_image)
-                        texture_np = np.array(texture_image)
-                        
-                        # Seçilen 4 nokta (hedef çokgen) numpy dizisine çevriliyor.
-                        dst_pts = np.array(coords, dtype="float32")
-                        h_tex, w_tex = texture_np.shape[:2]
-                        src_pts = np.array([[0, 0],
-                                            [w_tex, 0],
-                                            [w_tex, h_tex],
-                                            [0, h_tex]], dtype="float32")
-                        
-                        # Perspektif dönüşüm matrisini hesapla.
-                        M = cv2.getPerspectiveTransform(src_pts, dst_pts)
-                        warped_texture = cv2.warpPerspective(texture_np, M, (base_np.shape[1], base_np.shape[0]))
-                        
-                        # Dekoratif dokunun uygulanacağı alanı maskele.
-                        gray_warp = cv2.cvtColor(warped_texture, cv2.COLOR_BGR2GRAY)
-                        _, mask = cv2.threshold(gray_warp, 1, 255, cv2.THRESH_BINARY)
-                        mask_inv = cv2.bitwise_not(mask)
-                        base_bg = cv2.bitwise_and(base_np, base_np, mask=mask_inv)
-                        deco_fg = cv2.bitwise_and(warped_texture, warped_texture, mask=mask)
-                        result = cv2.add(base_bg, deco_fg)
-                        
-                        result_image = Image.fromarray(result)
-                        st.image(result_image, caption="Dekore Edilmiş Yüzey", use_column_width=True)
-                        
-                        ##############################################
-                        # Adım 6: İndir / Devamlı Düzenleme
-                        ##############################################
-                        st.header("Adım 6: İndir / Devamlı Düzenleme")
-                        st.download_button("Dekore Edilmiş Resmi İndir",
-                                           data=result_image.tobytes(),
-                                           file_name="decorated.png",
-                                           mime="image/png")
-                        st.success("Dekorasyon uygulandı. Yeni alan ekleyebilir veya mevcut dekorasyonu değiştirebilirsiniz.")
+                ########################################################
+                # Adım 4: Perspektif Dönüşümü ve Swap İşleminin Uygulanması
+                ########################################################
+                st.header("Adım 4: Swap İşlemi Uygulandı")
+                
+                # Referans resmin tamamını kaynaktan alıyoruz.
+                ref_np = np.array(ref_img)
+                # Kaynak köşe noktaları (referans resmin tam köşeleri)
+                src_pts = np.float32([[0, 0],
+                                      [ref_np.shape[1], 0],
+                                      [ref_np.shape[1], ref_np.shape[0]],
+                                      [0, ref_np.shape[0]]])
+                # Hedef köşe noktaları: kullanıcı tarafından belirlenen alan
+                dst_pts = np.float32(points)
+                
+                # Perspektif dönüşüm matrisini hesaplayın
+                M = cv2.getPerspectiveTransform(src_pts, dst_pts)
+                target_np = np.array(target_img)
+                # Referans resmi hedef odanın boyutlarına göre warp (dönüştürme) yapıyoruz.
+                warped_ref = cv2.warpPerspective(np.array(ref_img), M, (target_np.shape[1], target_np.shape[0]))
+                
+                # Mask oluşturuyoruz: Warped referans resimdeki dolu alanları belirlemek için (siyah olmayan bölgeler)
+                warped_gray = cv2.cvtColor(warped_ref, cv2.COLOR_BGR2GRAY)
+                _, mask = cv2.threshold(warped_gray, 1, 255, cv2.THRESH_BINARY)
+                mask_inv = cv2.bitwise_not(mask)
+                
+                # Hedef odanın, warp edilmiş bölge dışında kalan kısmını koruyoruz.
+                target_bg = cv2.bitwise_and(target_np, target_np, mask=mask_inv)
+                # İki resmi birleştiriyoruz.
+                combined = cv2.add(target_bg, warped_ref)
+                result_img = Image.fromarray(combined)
+                
+                st.image(result_img, caption="Swap Sonucu", use_column_width=True)
