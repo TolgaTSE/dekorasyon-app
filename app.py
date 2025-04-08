@@ -5,7 +5,7 @@ import cv2
 import base64
 from io import BytesIO
 
-# streamlit_drawable_canvas modülünü sdc olarak import ediyoruz
+# streamlit_drawable_canvas modülünü sdc (alias) olarak import ediyoruz.
 import streamlit_drawable_canvas as sdc
 
 ##############################################
@@ -21,7 +21,7 @@ def pil_image_to_data_url(image):
 
 def custom_resize_img(img, new_height, new_width):
     """Eğer img bir PIL.Image ise belirtilen boyuta yeniden boyutlandırır;
-    eğer img bir data URL (string) ise, önce PIL.Image'e çevirip sonra yeniden boyutlandırır."""
+    eğer img bir data URL (string) ise önce PIL.Image'e çevirir, sonra yeniden boyutlandırır."""
     if isinstance(img, Image.Image):
         return img.resize((int(new_width), int(new_height)))
     elif isinstance(img, str):
@@ -65,21 +65,19 @@ if uploaded_surface:
     base_image = Image.open(uploaded_surface).convert("RGB")
     st.image(base_image, caption="Yüklenen Yüzey Resmi", use_column_width=True)
     
-    # Arka plan resmi için base64 URL oluşturuluyor.
-    bg_img_url = pil_image_to_data_url(base_image)
-    
     ##############################################
     # Adım 2: Dekorasyon Alanını Belirleyin (Çizim)
     ##############################################
     st.header("Adım 2: Dekorasyon Alanını Belirleyin")
     st.write("Resim üzerinde alan belirlemek için fare ile çokgen çizin (en az 3 nokta, ideal olarak 4 nokta).")
     
+    # Arka plan resmi olarak PIL.Image nesnesini (base_image) veriyoruz.
     canvas_result = sdc.st_canvas(
         fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu rengi
         stroke_width=2,
         stroke_color="#FF0000",
         background_color="rgba(0,0,0,0)",    # Şeffaf arka plan
-        background_image=bg_img_url,
+        background_image=base_image,         # PIL.Image nesnesi burada
         height=base_image.height,
         width=base_image.width,
         drawing_mode="polygon",
@@ -100,7 +98,7 @@ if uploaded_surface:
                 st.error("Lütfen en az 3 nokta seçin!")
             else:
                 st.write("Seçtiğiniz Noktalar:", coords)
-                # Eğer tam 3 nokta seçilmişse, otomatik olarak 4. nokta hesaplanır.
+                # Eğer tam olarak 3 nokta seçildiyse, basit bir hesapla 4. noktayı ekleyelim.
                 if len(coords) == 3:
                     def compute_fourth_point(points):
                         p0, p1, p2 = points
@@ -108,7 +106,7 @@ if uploaded_surface:
                     fourth = compute_fourth_point(coords)
                     coords.append(fourth)
                     st.write("Otomatik eklenen 4. nokta:", fourth)
-                # Eğer 4'ten fazla nokta seçildiyse, ilk 4 nokta kullanılır.
+                # Eğer 4'ten fazla nokta seçildiyse, ilk 4 noktayı kullanıyoruz.
                 if len(coords) > 4:
                     coords = coords[:4]
                     st.write("İlk 4 nokta kullanıldı:", coords)
@@ -155,7 +153,7 @@ if uploaded_surface:
                         M = cv2.getPerspectiveTransform(src_pts, dst_pts)
                         warped_texture = cv2.warpPerspective(texture_np, M, (base_np.shape[1], base_np.shape[0]))
                         
-                        # Dekoratif dokunun uygulanacağı alanı maske oluşturuyoruz.
+                        # Dekoratif dokunun uygulanacağı alanı maskele.
                         gray_warp = cv2.cvtColor(warped_texture, cv2.COLOR_BGR2GRAY)
                         _, mask = cv2.threshold(gray_warp, 1, 255, cv2.THRESH_BINARY)
                         mask_inv = cv2.bitwise_not(mask)
