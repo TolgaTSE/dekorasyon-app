@@ -1,5 +1,5 @@
 import streamlit as st
-from streamlit_drawable_canvas import st_canvas
+from streamlit_drawable_canvas import st_canvas, st_image
 from PIL import Image
 import numpy as np
 import cv2
@@ -12,6 +12,16 @@ def pil_image_to_data_url(image):
     image.save(buffered, format="PNG")
     img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
     return f"data:image/png;base64,{img_str}"
+
+# Monkey-patch: st_image modülündeki image_to_url fonksiyonunu tanımlıyoruz.
+def image_to_url(pil_img, height, width):
+    # Görüntüyü istenen boyutlara yeniden boyutlandır
+    img_resized = pil_img.resize((width, height))
+    # ve base64 veri URL'sine dönüştür
+    return pil_image_to_data_url(img_resized)
+
+# Bu satır ile st_image.image_to_url artık bizim tanımladığımız fonksiyonu gösterecek.
+st_image.image_to_url = image_to_url
 
 # Uygulama Başlığı
 st.title("Dekorasyon Uygulaması")
@@ -29,27 +39,27 @@ if uploaded_surface:
     st.header("Adım 2: Dekorasyon Alanını Belirleyin")
     st.write("Resim üzerinde alan belirlemek için fare ile çokgen çiziniz (min. 3 nokta, ideal olarak 4 nokta).")
     
- 
-    
+    # Arka plan resmi olarak doğrudan PIL image nesnesini kullanıyoruz.
     canvas_result = st_canvas(
         fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu rengi
         stroke_width=2,
         stroke_color="#FF0000",
         background_color="#eee",
-        background_image=base_image,  # Güncelleme burada: PIL image'i direkt veriyoruz.
+        background_image=base_image,  # PIL image nesnesini gönderiyoruz.
         height=base_image.height,
         width=base_image.width,
         drawing_mode="polygon",
         key="canvas",
     )
     
-    # Seçilen noktalara ilişkin işlemler ve sonraki adımlar burada devam eder...
+    # Çizim verilerini işleme:
     if canvas_result.json_data is not None:
         objects = canvas_result.json_data.get("objects", [])
         if objects:
             # İlk çizilen çokgeni alıyoruz
             poly = objects[0]
             coords = []
+            # Çizim yolundaki komutlardan (M: başlat, L: çizgi) koordinatları çıkarıyoruz.
             for item in poly["path"]:
                 if item[0] in ["M", "L"]:
                     coords.append([item[1], item[2]])
@@ -57,7 +67,7 @@ if uploaded_surface:
                 st.error("Lütfen en az 3 nokta seçin!")
             else:
                 st.write("Seçtiğiniz Noktalar:", coords)
-                # Eğer 3 nokta seçildiyse, otomatik 4. noktayı hesapla
+                # Eğer 3 nokta seçildiyse, otomatik 4. noktayı hesaplayın
                 if len(coords) == 3:
                     def compute_fourth_point(points):
                         p0, p1, p2 = points
@@ -68,7 +78,7 @@ if uploaded_surface:
                 if len(coords) > 4:
                     coords = coords[:4]
                     st.write("İlk 4 nokta kullanıldı:", coords)
-                
+                    
                 # Devam eden adımlar: Dekoratif doku yükleme, boyut girişi ve dekorasyonun uygulanması...
                 st.header("Adım 3: Dekoratif Doku Yükleyin")
                 uploaded_texture = st.file_uploader("Dekoratif doku resmini yükleyin (jpg, jpeg, png)", type=["jpg", "jpeg", "png"], key="texture")
