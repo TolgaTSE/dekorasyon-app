@@ -5,11 +5,11 @@ import cv2
 import base64
 from io import BytesIO
 
-# streamlit_drawable_canvas'yu sdc adında import ediyoruz.
+# streamlit_drawable_canvas modülünü sdc olarak import ediyoruz.
 import streamlit_drawable_canvas as sdc
 
 ##############################################
-# Monkey-Patch İşlemleri: st_image Fonksiyonlarını
+# Monkey-Patch İşlemleri: st_image Fonksiyonlarını Yeniden Tanımlama
 ##############################################
 
 # Yardımcı fonksiyon: PIL.Image'i base64 veri URL'sine dönüştürür.
@@ -20,28 +20,28 @@ def pil_image_to_data_url(image):
     return f"data:image/png;base64,{img_str}"
 
 # Eğer gelen nesne bir PIL.Image ise istenen boyuta yeniden boyutlandırır;
-# eğer gelen nesne string (data URL) ise, önce PIL.Image'e çevirir, sonra boyutlandırır.
+# Eğer gelen nesne bir data URL (string) ise, önce PIL.Image'e çevirir, sonra boyutlandırır.
 def custom_resize_img(img, new_height, new_width):
     if isinstance(img, Image.Image):
         return img.resize((int(new_width), int(new_height)))
     elif isinstance(img, str):
         try:
             header, encoded = img.split(",", 1)
+            data = base64.b64decode(encoded)
+            pil_img = Image.open(BytesIO(data))
+            return pil_img.resize((int(new_width), int(new_height)))
         except Exception:
             return img
-        data = base64.b64decode(encoded)
-        pil_img = Image.open(BytesIO(data))
-        return pil_img.resize((int(new_width), int(new_height)))
     return img
 
-# _resize_img ile boyutlandırılmış görüntüyü base64 URL'sine dönüştürür.
-def custom_image_to_url(img, height, width):
+# custom_image_to_url artık fazladan gelen argümanları alacak şekilde ayarlandı.
+def custom_image_to_url(img, height, width, *args, **kwargs):
     resized = custom_resize_img(img, height, width)
     if isinstance(resized, Image.Image):
         return pil_image_to_data_url(resized)
     return resized
 
-# Monkey-patch: streamlit_drawable_canvas içinde kullanılan st_image modülünü güncelliyoruz.
+# Monkey-patch: st_image modülündeki ilgili fonksiyonları güncelliyoruz.
 sdc.st_image._resize_img = custom_resize_img
 sdc.st_image.image_to_url = custom_image_to_url
 
@@ -69,9 +69,9 @@ if uploaded_surface:
     st.header("Adım 2: Dekorasyon Alanını Belirleyin")
     st.write("Resim üzerinde alan belirlemek için fare ile çokgen çizin (en az 3 nokta, ideal olarak 4 nokta).")
     
-    # Arka plan resmi olarak PIL.Image nesnesini (base_image) gönderiyoruz.
+    # Arka plan resmi olarak doğrudan PIL.Image nesnesini gönderiyoruz.
     canvas_result = sdc.st_canvas(
-        fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu rengi
+        fill_color="rgba(255,165,0,0.3)",   # Yarı saydam dolgu rengi
         stroke_width=2,
         stroke_color="#FF0000",
         background_color="#eee",
