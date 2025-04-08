@@ -29,15 +29,14 @@ if uploaded_surface:
     st.header("Adım 2: Dekorasyon Alanını Belirleyin")
     st.write("Resim üzerinde alan belirlemek için fare ile çokgen çiziniz (min. 3 nokta, ideal olarak 4 nokta).")
     
-    # PIL image'i base64 URL'ye dönüştürün
-    base_image_url = pil_image_to_data_url(base_image)
+ 
     
     canvas_result = st_canvas(
         fill_color="rgba(255,165,0,0.3)",  # Yarı saydam dolgu rengi
         stroke_width=2,
         stroke_color="#FF0000",
         background_color="#eee",
-        background_image=base_image_url,  # Dönüştürülmüş URL'yi kullanıyoruz.
+        background_image=base_image,  # Güncelleme burada: PIL image'i direkt veriyoruz.
         height=base_image.height,
         width=base_image.width,
         drawing_mode="polygon",
