@@ -7,7 +7,7 @@ import cv2
 import os
 
 # Kişisel erişim tokenınızı ayarlayın (bu satırı güvenli bir şekilde saklayın).
-os.environ["GITHUB_TOKEN"] = "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
+os.environ["GITHUB_TOKEN"] = "tolgatse"
 
 # Modeli yüklüyoruz (DeepLabV3-ResNet101, pre-trained)
 @st.cache(allow_output_mutation=True)
