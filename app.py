@@ -1,23 +1,24 @@
 import streamlit as st
-from streamlit_drawable_canvas import st_canvas, st_image
 from PIL import Image
 import numpy as np
 import cv2
 import base64
 from io import BytesIO
 
-#########################################
-# Monkey-patch Bölgesi: st_image Fonksiyonları
-#########################################
+##############################################
+# Monkey-Patch: st_image Fonksiyonlarının
+# Yeniden Tanımlanması (İşlem sırası çok önemli)
+##############################################
 
 # Yardımcı fonksiyon: PIL.Image'i base64 veri URL'sine dönüştürür.
 def pil_image_to_data_url(image):
     buffered = BytesIO()
     image.save(buffered, format="PNG")
-    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{img_str}"
 
-# Custom _resize_img: Eğer img bir PIL.Image ise, istenen boyuta yeniden boyutlandırır; değilse olduğu gibi döndürür.
+# Custom _resize_img: Eğer img bir PIL.Image ise, istenen boyuta yeniden boyutlandırır; 
+# değilse olduğu gibi döndürür.
 def custom_resize_img(img, new_height, new_width):
     if isinstance(img, Image.Image):
         return img.resize((int(new_width), int(new_height)))
@@ -30,20 +31,25 @@ def custom_image_to_url(img, height, width):
         return pil_image_to_data_url(resized)
     return resized
 
-# Monkey-patch: st_image modülündeki ilgili fonksiyonları güncelliyoruz.
-st_image._resize_img = custom_resize_img
-st_image.image_to_url = custom_image_to_url
+# En erken aşamada st_image modülünü import edip monkey-patch uyguluyoruz.
+# NOT: Bu import sırası, st_canvas içindeki kodun bizim güncellemelerimizi kullanabilmesi için önemlidir.
+import streamlit_drawable_canvas.st_image as st_img_module
+st_img_module._resize_img = custom_resize_img
+st_img_module.image_to_url = custom_image_to_url
 
-#########################################
-# Uygulama Başlangıcı
-#########################################
+# Daha sonra st_canvas ve st_image’yı import ediyoruz.
+from streamlit_drawable_canvas import st_canvas, st_image
+
+##############################################
+# Uygulama Kısmı
+##############################################
 
 st.title("Dekorasyon Uygulaması")
 st.write("Bu uygulama, yüklediğiniz yüzey resmi üzerinde seçtiğiniz alana dekoratif doku yerleştirmenizi sağlar.")
 
-#########################################
+##############################################
 # Adım 1: Yüzey Resmini Yükleme
-#########################################
+##############################################
 st.header("Adım 1: Yüzey Resmini Yükleyin")
 uploaded_surface = st.file_uploader("Dekore edeceğiniz yüzeyin resmini yükleyin (jpg, jpeg, png)", type=["jpg", "jpeg", "png"])
 
@@ -51,13 +57,13 @@ if uploaded_surface:
     base_image = Image.open(uploaded_surface).convert("RGB")
     st.image(base_image, caption="Yüklenen Yüzey Resmi", use_column_width=True)
     
-    #########################################
+    ##############################################
     # Adım 2: Dekorasyon Alanını Belirleyin (Çizim)
-    #########################################
+    ##############################################
     st.header("Adım 2: Dekorasyon Alanını Belirleyin")
     st.write("Resim üzerinde alan belirlemek için fare ile çokgen çizin (en az 3 nokta, ideal olarak 4 nokta).")
     
-    # Arka plan resmi olarak doğrudan PIL.Image nesnesini kullanıyoruz.
+    # Arka plan resmi olarak doğrudan PIL.Image nesnesini gönderiyoruz.
     canvas_result = st_canvas(
         fill_color="rgba(255,165,0,0.3)",   # Yarı saydam dolgu rengi
         stroke_width=2,
@@ -92,23 +98,23 @@ if uploaded_surface:
                     fourth = compute_fourth_point(coords)
                     coords.append(fourth)
                     st.write("Otomatik eklenen 4. nokta:", fourth)
-                # Eğer 4'ten fazla nokta seçildiyse ilk 4'ü kullanıyoruz.
+                # Eğer 4'ten fazla nokta seçildiyse, ilk 4 noktayı kullanıyoruz.
                 if len(coords) > 4:
                     coords = coords[:4]
                     st.write("İlk 4 nokta kullanıldı:", coords)
                 
-                #########################################
+                ##############################################
                 # Adım 3: Dekoratif Doku Yükleme
-                #########################################
+                ##############################################
                 st.header("Adım 3: Dekoratif Doku Yükleyin")
                 uploaded_texture = st.file_uploader("Dekoratif doku resmini yükleyin (jpg, jpeg, png)", type=["jpg", "jpeg", "png"], key="texture")
                 if uploaded_texture:
                     texture_image = Image.open(uploaded_texture).convert("RGB")
                     st.image(texture_image, caption="Yüklenen Dekoratif Doku", use_column_width=True)
                     
-                    #########################################
+                    ##############################################
                     # Adım 4: Boyut Bilgilerini Girin
-                    #########################################
+                    ##############################################
                     st.header("Adım 4: Boyut Bilgilerini Girin")
                     st.write("Lütfen dekorasyon alanının yaklaşık uzunluk ve genişlik değerlerini ve dekoratif materyalin boyutunu girin (örn. cm veya m cinsinden, aynı birimde).")
                     area_length = st.number_input("Dekorasyon Alanı Uzunluğu", min_value=1.0, value=100.0)
@@ -116,9 +122,9 @@ if uploaded_surface:
                     deco_width = st.number_input("Dekoratif Materyal Genişliği", min_value=1.0, value=10.0)
                     deco_height = st.number_input("Dekoratif Materyal Yüksekliği", min_value=1.0, value=10.0)
                     
-                    #########################################
+                    ##############################################
                     # Adım 5: Dekorasyonu Uygula (Perspektif Dönüşümü)
-                    #########################################
+                    ##############################################
                     if st.button("Dekorasyonu Uygula"):
                         # OpenCV ile çalışmak için görüntüleri numpy dizilerine çeviriyoruz.
                         base_np = np.array(base_image)
@@ -138,7 +144,7 @@ if uploaded_surface:
                         M = cv2.getPerspectiveTransform(src_pts, dst_pts)
                         warped_texture = cv2.warpPerspective(texture_np, M, (base_np.shape[1], base_np.shape[0]))
                         
-                        # Dekoratif dokunun uygulanacağı alanı maskeleyelim.
+                        # Dekoratif dokunun uygulanacağı alanı maskele.
                         gray_warp = cv2.cvtColor(warped_texture, cv2.COLOR_BGR2GRAY)
                         _, mask = cv2.threshold(gray_warp, 1, 255, cv2.THRESH_BINARY)
                         mask_inv = cv2.bitwise_not(mask)
@@ -155,9 +161,9 @@ if uploaded_surface:
                         result_image = Image.fromarray(result)
                         st.image(result_image, caption="Dekore Edilmiş Yüzey", use_column_width=True)
                         
-                        #########################################
+                        ##############################################
                         # Adım 6: İndir / Devamlı Düzenleme
-                        #########################################
+                        ##############################################
                         st.header("Adım 6: İndir / Devamlı Düzenleme")
                         st.download_button("Dekore Edilmiş Resmi İndir", data=result_image.tobytes(), file_name="decorated.png", mime="image/png")
                         st.success("Dekorasyon uygulandı. Yeni alan ekleyebilir veya mevcut dekorasyonu değiştirebilirsiniz.")
